@@ -19,7 +19,7 @@ public class Bola : MonoBehaviour
 
     void Start()
     {
-        
+      
         rb = GetComponent<Rigidbody2D>();
         udpClient = FindObjectOfType<UdpClientTwoClients>();
 
@@ -77,13 +77,13 @@ public class Bola : MonoBehaviour
         else if (col.gameObject.CompareTag("Gol1"))
         {
             PontoB++;
-            textoPontoB.text = "Pontos:" + PontoB;
+            textoPontoB.text = PontoB.ToString();
             ResetBola();
         }
         else if (col.gameObject.CompareTag("Gol2"))
         {
             PontoA++;
-            textoPontoA.text = "Pontos:" + PontoA;
+            textoPontoA.text = PontoA.ToString();
             ResetBola();
         }
     }
