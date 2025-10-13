@@ -93,7 +93,7 @@ public class Bola : MonoBehaviour
         transform.position = Vector3.zero;
         rb.linearVelocity = Vector2.zero;
         
-        if (PontoA > 10 || PontoB > 10)
+        if (PontoA > 5 || PontoB > 5)
         {
             GameOver();
         }
@@ -114,19 +114,19 @@ public class Bola : MonoBehaviour
     {
         transform.position = Vector3.zero;
         rb.linearVelocity = Vector2.zero;
-        if (PontoA > 10 && udpClient.myId == 1)
+        if (PontoA > 5 && udpClient.myId == 1)
         {
             VitoriaLocal.gameObject.SetActive(true);
         }
-        else if (PontoA > 10 && udpClient.myId == 2)
+        else if (PontoA > 5 && udpClient.myId == 2)
         {
             VitoriaRemote.gameObject.SetActive(true);
         }
-        else if (PontoB > 10 && udpClient.myId == 1)
+        else if (PontoB > 5 && udpClient.myId == 1)
         {
             VitoriaRemote.gameObject.SetActive(true);
         }
-        else if (PontoB > 10 && udpClient.myId == 2)
+        else if (PontoB > 5 && udpClient.myId == 2)
         {
             VitoriaLocal.gameObject.SetActive(true);
         }
