@@ -15,8 +15,13 @@ public class UdpClientTwoClients : MonoBehaviour
 
     private Vector3 remotePos; // não começa mais em zero
     public int Velocidade = 20;
+    private float minY;
+    private float maxY;
+    
     public GameObject localCube;
-    public GameObject remoteCube;
+    public GameObject remoteCube1;
+    public GameObject remoteCube2;
+    public GameObject remoteCube3;
     public GameObject bola; // referência à bola no Inspector
 
     // Fila segura para passar mensagens da thread de rede -> main thread
@@ -25,7 +30,7 @@ public class UdpClientTwoClients : MonoBehaviour
     void Start()
     {
         client = new UdpClient();
-        serverEP = new IPEndPoint(IPAddress.Parse("10.57.1.183"), 5001);
+        serverEP = new IPEndPoint(IPAddress.Parse("10.57.1.27"), 5001);
         client.Connect(serverEP);
 
         receiveThread = new Thread(ReceiveData);
@@ -59,7 +64,19 @@ public class UdpClientTwoClients : MonoBehaviour
 
         // Limite no eixo Y
         Vector3 pos = localCube.transform.position;
-        pos.y = Mathf.Clamp(pos.y, -3f, 3f);
+        
+        if (myId == 1 || myId == 2)
+        {
+            minY = 1.5f;
+            maxY = 3f;
+        }
+        else if (myId == 3 || myId == 4)
+        {
+            minY = -3f;
+            maxY = -1.5f;
+        }
+        
+        pos.y = Mathf.Clamp(pos.y, minY, maxY);
         localCube.transform.position = pos;
 
         // Envia posição da raquete
@@ -68,9 +85,17 @@ public class UdpClientTwoClients : MonoBehaviour
         SendUdpMessage(msgPos);
 
         // Atualiza posição do outro jogador suavemente
-        if (remoteCube != null)
+        if (remoteCube1 != null)
         {
-            remoteCube.transform.position = Vector3.Lerp(remoteCube.transform.position, remotePos, Time.deltaTime * 10f);
+            remoteCube1.transform.position = Vector3.Lerp(remoteCube1.transform.position, remotePos, Time.deltaTime * 10f);
+        }
+        if (remoteCube2 != null)
+        {
+            remoteCube2.transform.position = Vector3.Lerp(remoteCube2.transform.position, remotePos, Time.deltaTime * 10f);
+        }
+        if (remoteCube3 != null)
+        {
+            remoteCube3.transform.position = Vector3.Lerp(remoteCube3.transform.position, remotePos, Time.deltaTime * 10f);
         }
     }
 
@@ -98,24 +123,75 @@ public class UdpClientTwoClients : MonoBehaviour
             if (myId == 1)
             {
                 localCube = GameObject.Find("Player 1");
-                remoteCube = GameObject.Find("Player 2");
+                remoteCube1 = GameObject.Find("Player 1.1");
+                remoteCube2 = GameObject.Find("Player 2");
+                remoteCube3 = GameObject.Find("Player 2.2");
 
-                localCube.transform.position = new Vector3(-8f, 0f, 0f); // Esquerda
-                remoteCube.transform.position = new Vector3(8f, 0f, 0f);  // Direita
+
+                localCube.transform.position = new Vector3(-8f, 2f, 0f); // Esquerda
+                remoteCube1.transform.position = new Vector3(-8f, -2f, 0f);  // Direita
+                remoteCube2.transform.position = new Vector3(8f, 2f, 0f);  // Direita
+                remoteCube3.transform.position = new Vector3(8f, -2f, 0f); // Esquerda
 
                 // Inicializa remotePos corretamente
-                remotePos = remoteCube.transform.position;
+                remotePos = remoteCube1.transform.position;
+                remotePos = remoteCube2.transform.position;
+                remotePos = remoteCube3.transform.position;
+
             }
             else if (myId == 2)
             {
                 localCube = GameObject.Find("Player 2");
-                remoteCube = GameObject.Find("Player 1");
+                remoteCube1 = GameObject.Find("Player 2.2");
+                remoteCube2 = GameObject.Find("Player 1");
+                remoteCube3 = GameObject.Find("Player 1.1");
 
-                localCube.transform.position = new Vector3(8f, 0f, 0f);   // Direita
-                remoteCube.transform.position = new Vector3(-8f, 0f, 0f); // Esquerda
+                localCube.transform.position = new Vector3(8f, 2f, 0f);   // Direita
+                remoteCube1.transform.position = new Vector3(8f, -2f, 0f); // Esquerda
+                remoteCube2.transform.position = new Vector3(-8f, 2f, 0f); // Esquerda
+                remoteCube3.transform.position = new Vector3(-8f, -2f, 0f);   // Direita
 
                 // Inicializa remotePos corretamente
-                remotePos = remoteCube.transform.position;
+                remotePos = remoteCube1.transform.position;
+                remotePos = remoteCube2.transform.position;
+                remotePos = remoteCube3.transform.position;
+
+            }
+            else if (myId == 3)
+            {
+                localCube = GameObject.Find("Player 1.1");
+                remoteCube1 = GameObject.Find("Player 1");
+                remoteCube3 = GameObject.Find("Player 2.2");
+                remoteCube2 = GameObject.Find("Player 2");
+
+                localCube.transform.position = new Vector3(-8f, -2f, 0f);   // Direita
+                remoteCube1.transform.position = new Vector3(-8f, 2f, 0f); // Esquerda
+                remoteCube2.transform.position = new Vector3(8f, -2f, 0f); // Esquerda
+                remoteCube3.transform.position = new Vector3(8f, 2f, 0f);   // Direita
+
+                // Inicializa remotePos corretamente
+                remotePos = remoteCube1.transform.position;
+                remotePos = remoteCube2.transform.position;
+                remotePos = remoteCube3.transform.position;
+
+            }
+            else if (myId == 4)
+            {
+                localCube = GameObject.Find("Player 2.2");
+                remoteCube1 = GameObject.Find("Player 2");
+                remoteCube3 = GameObject.Find("Player 1.1");
+                remoteCube2 = GameObject.Find("Player 1");
+
+                localCube.transform.position = new Vector3(8f, -2f, 0f);   // Direita
+                remoteCube1.transform.position = new Vector3(8f, 2f, 0f); // Esquerda
+                remoteCube2.transform.position = new Vector3(-8f, -2f, 0f); // Esquerda
+                remoteCube3.transform.position = new Vector3(-8f, 2f, 0f);   // Direita
+
+                // Inicializa remotePos corretamente
+                remotePos = remoteCube1.transform.position;
+                remotePos = remoteCube2.transform.position;
+                remotePos = remoteCube3.transform.position;
+
             }
 
             // Reset da bola

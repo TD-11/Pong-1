@@ -11,8 +11,8 @@ public class Bola : MonoBehaviour
     public int PontoB = 0;
     public TextMeshProUGUI textoPontoA;
     public TextMeshProUGUI textoPontoB;
-    public TextMeshProUGUI VitoriaLocal;
-    public TextMeshProUGUI VitoriaRemote;
+    public TextMeshProUGUI VitoriaTime1;
+    public TextMeshProUGUI VitoriaTime2;
 
     public float velocidade = 5f;   // Velocidade base da bola
     public float fatorDesvio = 2f;  // Quanto influencia o ponto de contato no ângulo
@@ -23,7 +23,7 @@ public class Bola : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         udpClient = FindObjectOfType<UdpClientTwoClients>();
 
-        if (udpClient != null && udpClient.myId == 2)
+        if (udpClient != null && udpClient.myId == 4)
         {
             Invoke("LancarBola", 1f);
         }
@@ -40,13 +40,13 @@ public class Bola : MonoBehaviour
     {
         if (udpClient == null) return;
 
-        if (!bolaLancada && udpClient.myId == 2)
+        if (!bolaLancada && udpClient.myId == 4)
         {
             bolaLancada = true;
             Invoke("LancarBola", 1f);
         }
 
-        if (udpClient.myId == 2)
+        if (udpClient.myId == 4)
         {
             string msg = "BALL:" +
                          transform.position.x.ToString(System.Globalization.CultureInfo.InvariantCulture) + ";" +
@@ -98,7 +98,7 @@ public class Bola : MonoBehaviour
             GameOver();
         }
         
-        else if (udpClient != null && udpClient.myId == 2)
+        else if (udpClient != null && udpClient.myId == 4)
         {
             Invoke("LancarBola", 1f);
 
@@ -116,20 +116,25 @@ public class Bola : MonoBehaviour
         rb.linearVelocity = Vector2.zero;
         if (PontoA > 5 && udpClient.myId == 1)
         {
-            VitoriaLocal.gameObject.SetActive(true);
+            VitoriaTime1.gameObject.SetActive(true);
+        }
+        else if (PontoA > 5 && udpClient.myId == 3)
+        {
+            VitoriaTime1.gameObject.SetActive(true);
         }
         else if (PontoA > 5 && udpClient.myId == 2)
         {
-            VitoriaRemote.gameObject.SetActive(true);
+            VitoriaTime2.gameObject.SetActive(true);
         }
-        else if (PontoB > 5 && udpClient.myId == 1)
+        else if (PontoB > 5 && udpClient.myId == 4)
         {
-            VitoriaRemote.gameObject.SetActive(true);
+            VitoriaTime2.gameObject.SetActive(true);
         }
-        else if (PontoB > 5 && udpClient.myId == 2)
-        {
-            VitoriaLocal.gameObject.SetActive(true);
-        }
+        
+        //else if (PontoB > 5 && udpClient.myId == 2)
+        //{
+        //    VitoriaLocal.gameObject.SetActive(true);
+        //}
         
     }
 }

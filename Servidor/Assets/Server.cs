@@ -5,13 +5,14 @@ using System.Text;
 using System.Threading;
 using System.Collections.Generic;
 
-public class UdpServerTwoClients : MonoBehaviour
+public class UdpServerFourClients : MonoBehaviour
 {
-    UdpClient server;
-    IPEndPoint anyEP;
-    Thread receiveThread;
-    Dictionary<string, int> clientIds = new Dictionary<string, int>();
-    int nextId = 1;
+    private UdpClient server;
+    private IPEndPoint anyEP;
+    private Thread receiveThread;
+    private Dictionary<string, int> clientIds = new Dictionary<string, int>();
+    private int nextId = 1;
+    private object lockObj = new object();
 
     void Start()
     {
@@ -19,6 +20,7 @@ public class UdpServerTwoClients : MonoBehaviour
         anyEP = new IPEndPoint(IPAddress.Any, 0);
 
         receiveThread = new Thread(ReceiveData);
+        receiveThread.IsBackground = true;
         receiveThread.Start();
 
         Debug.Log("Servidor iniciado na porta 5001");
@@ -28,33 +30,68 @@ public class UdpServerTwoClients : MonoBehaviour
     {
         while (true)
         {
-            byte[] data = server.Receive(ref anyEP);
-            string msg = Encoding.UTF8.GetString(data);
-            string key = anyEP.Address + ":" + anyEP.Port;
-
-            // atribui ID ao cliente novo
-            if (!clientIds.ContainsKey(key))
+            try
             {
-                clientIds[key] = nextId++;
-                string assignMsg = "ASSIGN:" + clientIds[key];
-                server.Send(Encoding.UTF8.GetBytes(assignMsg), assignMsg.Length, anyEP);
-                Debug.Log("Novo cliente conectado: " + key + " => ID " + clientIds[key]);
-            }
+                byte[] data = server.Receive(ref anyEP);
+                string msg = Encoding.UTF8.GetString(data);
+                string key = anyEP.Address + ":" + anyEP.Port;
 
-            Debug.Log("Servidor recebeu: " + msg);
-
-            // retransmite POS / BALL / SCORE
-            if (msg.StartsWith("POS:") || msg.StartsWith("BALL:") || msg.StartsWith("SCORE:"))
-            {
-                byte[] bdata = Encoding.UTF8.GetBytes(msg);
-                foreach (var kvp in clientIds)
+                lock (lockObj)
                 {
-                    var parts = kvp.Key.Split(':');
-                    IPEndPoint ep = new IPEndPoint(IPAddress.Parse(parts[0]), int.Parse(parts[1]));
-                    server.Send(bdata, bdata.Length, ep);
-                    Debug.Log("Enviado para " + kvp.Key + ": " + msg);
+                    // Registra novo cliente
+                    if (!clientIds.ContainsKey(key))
+                    {
+                        if (clientIds.Count < 4) // limite de 4 jogadores
+                        {
+                            clientIds[key] = nextId++;
+                            string assignMsg = "ASSIGN:" + clientIds[key];
+                            server.Send(Encoding.UTF8.GetBytes(assignMsg), assignMsg.Length, anyEP);
+                            Debug.Log($"Novo cliente {key} => ID {clientIds[key]}");
+                        }
+                        else
+                        {
+                            string fullMsg = "SERVER_FULL";
+                            server.Send(Encoding.UTF8.GetBytes(fullMsg), fullMsg.Length, anyEP);
+                            Debug.Log($"Conexão recusada (lotado): {key}");
+                            continue;
+                        }
+                    }
+                }
+
+                Debug.Log($"Recebido de {key}: {msg}");
+
+                // Reenvia para todos os clientes
+                if (msg.StartsWith("POS:") || msg.StartsWith("BALL:") || msg.StartsWith("SCORE:"))
+                {
+                    Broadcast(msg);
                 }
             }
+            catch (SocketException ex)
+            {
+                Debug.LogError("Erro de socket: " + ex.Message);
+            }
         }
+    }
+
+    void Broadcast(string message)
+    {
+        byte[] bdata = Encoding.UTF8.GetBytes(message);
+
+        lock (lockObj)
+        {
+            foreach (var kvp in clientIds)
+            {
+                string[] parts = kvp.Key.Split(':');
+                IPEndPoint ep = new IPEndPoint(IPAddress.Parse(parts[0]), int.Parse(parts[1]));
+                server.Send(bdata, bdata.Length, ep);
+                Debug.Log($"Enviado para {kvp.Key}: {message}");
+            }
+        }
+    }
+
+    void OnApplicationQuit()
+    {
+        receiveThread?.Abort();
+        server?.Close();
     }
 }
