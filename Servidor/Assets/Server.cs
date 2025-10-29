@@ -41,7 +41,7 @@ public class UdpServerFourClients : MonoBehaviour
                     // Registra novo cliente
                     if (!clientIds.ContainsKey(key))
                     {
-                        if (clientIds.Count < 4) // limite de 4 jogadores
+                        if (clientIds.Count <= 4) // limite de 4 jogadores
                         {
                             clientIds[key] = nextId++;
                             string assignMsg = "ASSIGN:" + clientIds[key];

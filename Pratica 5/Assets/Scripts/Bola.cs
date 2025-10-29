@@ -1,105 +1,154 @@
 using UnityEngine;
-using TMPro;
+using System.Net.Sockets;
+using System.Net;
+using System.Text;
+using System.Threading;
+using System.Globalization;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 
-public class Bola : MonoBehaviour
+public class UdpClientFourClients : MonoBehaviour
 {
-    private Rigidbody2D rb;
-    private UdpClientFourPlayers udpClient;
-    private bool bolaLancada = false;
+    public int myId = -1;
+    UdpClient client;
+    Thread receiveThread;
+    IPEndPoint serverEP;
 
-    public int PontoA = 0;
-    public int PontoB = 0;
+    public int Velocidade = 20;
+    public GameObject bola;
 
-    public TextMeshProUGUI textoPontoA;
-    public TextMeshProUGUI textoPontoB;
-    public TextMeshProUGUI VitoriaTime1;
-    public TextMeshProUGUI VitoriaTime2;
+    // referência para todos os 4 jogadores
+    private Dictionary<int, GameObject> players = new Dictionary<int, GameObject>();
+    private Dictionary<int, Vector3> remotePositions = new Dictionary<int, Vector3>();
 
-    public float velocidade = 5f; // Velocidade da bola
-    public float fatorDesvio = 2f; // Influência do ponto de contato
+    private ConcurrentQueue<string> messageQueue = new ConcurrentQueue<string>();
 
     void Start()
     {
-        rb = GetComponent<Rigidbody2D>();
-        udpClient = FindObjectOfType<UdpClientFourPlayers>();
+        client = new UdpClient();
+        serverEP = new IPEndPoint(IPAddress.Parse("10.57.1.146"), 5001);
+        client.Connect(serverEP);
 
-        if (udpClient != null && udpClient.myId == 1) // Host da bola
+        receiveThread = new Thread(ReceiveData);
+        receiveThread.Start();
+
+        client.Send(Encoding.UTF8.GetBytes("HELLO"), 5);
+
+        // Busca todas as raquetes
+        for (int i = 1; i <= 4; i++)
         {
-            Invoke("LancarBola", 1f);
+            GameObject p = GameObject.Find("Player " + i);
+            if (p != null) players[i] = p;
+            remotePositions[i] = Vector3.zero;
         }
-    }
 
-    void LancarBola()
-    {
-        float dirX = Random.Range(0, 2) == 0 ? -1 : 1;
-        float dirY = Random.Range(-0.5f, 0.5f);
-        rb.linearVelocity = new Vector2(dirX, dirY).normalized * velocidade;
-        bolaLancada = true;
+        if (bola != null)
+        {
+            bola.transform.position = Vector3.zero;
+            var rb = bola.GetComponent<Rigidbody2D>();
+            if (rb != null) rb.linearVelocity = Vector2.zero;
+        }
     }
 
     void Update()
     {
-        if (udpClient == null) return;
+        // processa mensagens
+        while (messageQueue.TryDequeue(out string msg))
+            ProcessMessage(msg);
 
-        // Host envia posição da bola
-        if (udpClient.myId == 1 && bolaLancada)
+        if (myId == -1 || !players.ContainsKey(myId)) return;
+
+        // movimentação local
+        float v = Input.GetAxis("Vertical");
+        GameObject local = players[myId];
+        local.transform.Translate(new Vector3(0, v, 0) * Time.deltaTime * Velocidade);
+
+        // limite
+        Vector3 pos = local.transform.position;
+        pos.y = Mathf.Clamp(pos.y, -3f, 3f);
+        local.transform.position = pos;
+
+        // envia posição
+        string msgPos = $"POS:{myId};{pos.x.ToString("F2", CultureInfo.InvariantCulture)};{pos.y.ToString("F2", CultureInfo.InvariantCulture)}";
+        SendUdpMessage(msgPos);
+
+        // interpola raquetes remotas
+        foreach (var kv in players)
         {
-            string msg = $"BALL:{transform.position.x.ToString(System.Globalization.CultureInfo.InvariantCulture)};" +
-                         $"{transform.position.y.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
-            udpClient.SendUdpMessage(msg);
+            int id = kv.Key;
+            if (id == myId) continue;
+            kv.Value.transform.position = Vector3.Lerp(kv.Value.transform.position, remotePositions[id], Time.deltaTime * 10f);
         }
     }
 
-    void OnCollisionEnter2D(Collision2D col)
+    void ReceiveData()
     {
-        if (col.gameObject.CompareTag("Raquete"))
+        IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+        while (true)
         {
-            float posYbola = transform.position.y;
-            float posYraquete = col.transform.position.y;
-            float alturaRaquete = col.collider.bounds.size.y;
-            float diferenca = (posYbola - posYraquete) / (alturaRaquete / 2f);
-
-            Vector2 direcao = new Vector2(Mathf.Sign(rb.linearVelocity.x), diferenca * fatorDesvio);
-            rb.linearVelocity = direcao.normalized * velocidade;
-        }
-        else if (col.gameObject.CompareTag("Gol1"))
-        {
-            PontoB++;
-            textoPontoB.text = PontoB.ToString();
-            ResetBola();
-        }
-        else if (col.gameObject.CompareTag("Gol2"))
-        {
-            PontoA++;
-            textoPontoA.text = PontoA.ToString();
-            ResetBola();
+            byte[] data = client.Receive(ref remoteEP);
+            string msg = Encoding.UTF8.GetString(data);
+            messageQueue.Enqueue(msg);
         }
     }
 
-    void ResetBola()
+    void ProcessMessage(string msg)
     {
-        transform.position = Vector3.zero;
-        rb.linearVelocity = Vector2.zero;
-        bolaLancada = false;
+        if (msg.StartsWith("ASSIGN:"))
+        {
+            myId = int.Parse(msg.Substring(7));
+            Debug.Log("[Cliente] Meu ID = " + myId);
 
-        if (PontoA > 5 || PontoB > 5)
-        {
-            GameOver();
+            // posicionamento inicial
+            switch (myId)
+            {
+                case 1: players[1].transform.position = new Vector3(-8f, 2f, 0); break;
+                case 2: players[2].transform.position = new Vector3(-8f, -2f, 0); break;
+                case 3: players[3].transform.position = new Vector3(8f, 2f, 0); break;
+                case 4: players[4].transform.position = new Vector3(8f, -2f, 0); break;
+            }
+
+            // inicializa posição remota
+            foreach (var id in players.Keys)
+                remotePositions[id] = players[id].transform.position;
         }
-        else if (udpClient != null && udpClient.myId == 1)
+        else if (msg.StartsWith("POS:"))
         {
-            Invoke("LancarBola", 1f);
-            string msgScore = $"SCORE:{PontoA};{PontoB}";
-            udpClient.SendUdpMessage(msgScore);
+            string[] parts = msg.Substring(4).Split(';');
+            if (parts.Length == 3)
+            {
+                int id = int.Parse(parts[0]);
+                if (id != myId)
+                {
+                    float x = float.Parse(parts[1], CultureInfo.InvariantCulture);
+                    float y = float.Parse(parts[2], CultureInfo.InvariantCulture);
+                    remotePositions[id] = new Vector3(x, y, 0);
+                }
+            }
+        }
+        else if (msg.StartsWith("BALL:"))
+        {
+            if (myId != 3) // suponha que jogador 3 é o "host da bola"
+            {
+                string[] parts = msg.Substring(5).Split(';');
+                if (parts.Length == 2 && bola != null)
+                {
+                    float x = float.Parse(parts[0], CultureInfo.InvariantCulture);
+                    float y = float.Parse(parts[1], CultureInfo.InvariantCulture);
+                    bola.transform.position = new Vector3(x, y, 0);
+                }
+            }
         }
     }
 
-    void GameOver()
+    public void SendUdpMessage(string msg)
     {
-        transform.position = Vector3.zero;
-        rb.linearVelocity = Vector2.zero;
+        client.Send(Encoding.UTF8.GetBytes(msg), msg.Length);
+    }
 
-        if (PontoA > 5) VitoriaTime1.gameObject.SetActive(true);
-        else if (PontoB > 5) VitoriaTime2.gameObject.SetActive(true);
+    void OnApplicationQuit()
+    {
+        receiveThread.Abort();
+        client.Close();
     }
 }
