@@ -1,266 +1,183 @@
-using UnityEngine;
-using System.Net.Sockets;
+using System;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Globalization;
-using System.Collections.Concurrent;
+using UnityEngine;
 
 public class UdpClientTwoClients : MonoBehaviour
 {
-    public int myId = -1; // Agora público para a Bola acessar
-    UdpClient client;
-    Thread receiveThread;
-    IPEndPoint serverEP;
-
-    private Vector3 remotePos; // não começa mais em zero
-    public int Velocidade = 20;
-    private float minY;
-    private float maxY;
-    
+    public int myId; // 1, 1.1, 2, 2.2 ou 4 (servidor)
     public GameObject localCube;
     public GameObject remoteCube1;
     public GameObject remoteCube2;
     public GameObject remoteCube3;
-    public GameObject bola; // referência à bola no Inspector
+    public GameObject bola;
 
-    // Fila segura para passar mensagens da thread de rede -> main thread
-    private ConcurrentQueue<string> messageQueue = new ConcurrentQueue<string>();
+    private Vector3 remotePos1;
+    private Vector3 remotePos2;
+    private Vector3 remotePos3;
+
+    private Vector3 smoothVel1;
+    private Vector3 smoothVel2;
+    private Vector3 smoothVel3;
+
+    private UdpClient udp;
+    private IPEndPoint remoteEndPoint;
+    private Thread receiveThread;
+
+    private bool bolaAtiva = false;
+    private Vector3 bolaPos;
 
     void Start()
     {
-        client = new UdpClient();
-        serverEP = new IPEndPoint(IPAddress.Parse("10.57.1.27"), 5001);
-        client.Connect(serverEP);
+        udp = new UdpClient(5000 + myId);
+        remoteEndPoint = new IPEndPoint(IPAddress.Broadcast, 5000);
 
-        receiveThread = new Thread(ReceiveData);
+        udp.EnableBroadcast = true;
+
+        receiveThread = new Thread(new ThreadStart(ReceiveData));
+        receiveThread.IsBackground = true;
         receiveThread.Start();
-
-        client.Send(Encoding.UTF8.GetBytes("HELLO"), 5);
-
-        // bola sempre começa no centro
-        if (bola != null)
-        {
-            bola.transform.position = Vector3.zero;
-            var rb = bola.GetComponent<Rigidbody2D>();
-            if (rb != null)
-                rb.linearVelocity = Vector2.zero;
-        }
     }
 
     void Update()
     {
-        // processa mensagens vindas da thread de rede
-        while (messageQueue.TryDequeue(out string msg))
+        // MOVIMENTO LOCAL (apenas quem controla a raquete)
+        if (localCube != null && myId != 4)
         {
-            ProcessMessage(msg);
+            float move = Input.GetAxisRaw("Vertical");
+            localCube.transform.Translate(Vector3.up * move * 5f * Time.deltaTime);
+
+            string msg = "POS:" +
+                         myId + ";" +
+                         localCube.transform.position.x.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                         ";" +
+                         localCube.transform.position.y.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            SendUdpMessage(msg);
         }
 
-        if (myId == -1 || localCube == null) return;
-
-        // Movimento vertical da raquete
-        float v = Input.GetAxis("Vertical");
-        localCube.transform.Translate(new Vector3(0, v, 0) * Time.deltaTime * Velocidade);
-
-        // Limite no eixo Y
-        Vector3 pos = localCube.transform.position;
-        
-        if (myId == 1 || myId == 2)
-        {
-            minY = 1.5f;
-            maxY = 3f;
-        }
-        else if (myId == 3 || myId == 4)
-        {
-            minY = -3f;
-            maxY = -1.5f;
-        }
-        
-        pos.y = Mathf.Clamp(pos.y, minY, maxY);
-        localCube.transform.position = pos;
-
-        // Envia posição da raquete
-        string msgPos = "POS:" + myId + ";" + localCube.transform.position.x.ToString("F2", CultureInfo.InvariantCulture) + ";" + localCube.transform.position.y.ToString("F2", CultureInfo.InvariantCulture);
-
-        SendUdpMessage(msgPos);
-
-        // Atualiza posição do outro jogador suavemente
+        // MOVIMENTO REMOTO (interpolação suave)
         if (remoteCube1 != null)
-        {
-            remoteCube1.transform.position = Vector3.Lerp(remoteCube1.transform.position, remotePos, Time.deltaTime * 10f);
-        }
+            remoteCube1.transform.position =
+                Vector3.SmoothDamp(remoteCube1.transform.position, remotePos1, ref smoothVel1, 0.1f);
+
         if (remoteCube2 != null)
-        {
-            remoteCube2.transform.position = Vector3.Lerp(remoteCube2.transform.position, remotePos, Time.deltaTime * 10f);
-        }
+            remoteCube2.transform.position =
+                Vector3.SmoothDamp(remoteCube2.transform.position, remotePos2, ref smoothVel2, 0.1f);
+
         if (remoteCube3 != null)
-        {
-            remoteCube3.transform.position = Vector3.Lerp(remoteCube3.transform.position, remotePos, Time.deltaTime * 10f);
-        }
+            remoteCube3.transform.position =
+                Vector3.SmoothDamp(remoteCube3.transform.position, remotePos3, ref smoothVel3, 0.1f);
+
+        // ATUALIZA POSIÇÃO DA BOLA (para todos, exceto host)
+        if (bola != null && myId != 4 && bolaAtiva)
+            bola.transform.position = bolaPos;
     }
 
-    void ReceiveData()
+    private void ReceiveData()
     {
-        IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
-
-        while (true)
+        IPEndPoint anyIP = new IPEndPoint(IPAddress.Any, 0);
+        try
         {
-            byte[] data = client.Receive(ref remoteEP);
-            string msg = Encoding.UTF8.GetString(data);
-
-            // joga mensagem na fila
-            messageQueue.Enqueue(msg);
-        }
-    }
-
-    void ProcessMessage(string msg)
-    {
-        if (msg.StartsWith("ASSIGN:"))
-        {
-            myId = int.Parse(msg.Substring(7));
-            Debug.Log("[Cliente] Meu ID = " + myId);
-
-            if (myId == 1)
+            while (true)
             {
-                localCube = GameObject.Find("Player 1");
-                remoteCube1 = GameObject.Find("Player 1.1");
-                remoteCube2 = GameObject.Find("Player 2");
-                remoteCube3 = GameObject.Find("Player 2.2");
-
-
-                localCube.transform.position = new Vector3(-8f, 2f, 0f); // Esquerda
-                remoteCube1.transform.position = new Vector3(-8f, -2f, 0f);  // Direita
-                remoteCube2.transform.position = new Vector3(8f, 2f, 0f);  // Direita
-                remoteCube3.transform.position = new Vector3(8f, -2f, 0f); // Esquerda
-
-                // Inicializa remotePos corretamente
-                remotePos = remoteCube1.transform.position;
-                remotePos = remoteCube2.transform.position;
-                remotePos = remoteCube3.transform.position;
-
-            }
-            else if (myId == 2)
-            {
-                localCube = GameObject.Find("Player 2");
-                remoteCube1 = GameObject.Find("Player 2.2");
-                remoteCube2 = GameObject.Find("Player 1");
-                remoteCube3 = GameObject.Find("Player 1.1");
-
-                localCube.transform.position = new Vector3(8f, 2f, 0f);   // Direita
-                remoteCube1.transform.position = new Vector3(8f, -2f, 0f); // Esquerda
-                remoteCube2.transform.position = new Vector3(-8f, 2f, 0f); // Esquerda
-                remoteCube3.transform.position = new Vector3(-8f, -2f, 0f);   // Direita
-
-                // Inicializa remotePos corretamente
-                remotePos = remoteCube1.transform.position;
-                remotePos = remoteCube2.transform.position;
-                remotePos = remoteCube3.transform.position;
-
-            }
-            else if (myId == 3)
-            {
-                localCube = GameObject.Find("Player 1.1");
-                remoteCube1 = GameObject.Find("Player 1");
-                remoteCube3 = GameObject.Find("Player 2.2");
-                remoteCube2 = GameObject.Find("Player 2");
-
-                localCube.transform.position = new Vector3(-8f, -2f, 0f);   // Direita
-                remoteCube1.transform.position = new Vector3(-8f, 2f, 0f); // Esquerda
-                remoteCube2.transform.position = new Vector3(8f, -2f, 0f); // Esquerda
-                remoteCube3.transform.position = new Vector3(8f, 2f, 0f);   // Direita
-
-                // Inicializa remotePos corretamente
-                remotePos = remoteCube1.transform.position;
-                remotePos = remoteCube2.transform.position;
-                remotePos = remoteCube3.transform.position;
-
-            }
-            else if (myId == 4)
-            {
-                localCube = GameObject.Find("Player 2.2");
-                remoteCube1 = GameObject.Find("Player 2");
-                remoteCube3 = GameObject.Find("Player 1.1");
-                remoteCube2 = GameObject.Find("Player 1");
-
-                localCube.transform.position = new Vector3(8f, -2f, 0f);   // Direita
-                remoteCube1.transform.position = new Vector3(8f, 2f, 0f); // Esquerda
-                remoteCube2.transform.position = new Vector3(-8f, -2f, 0f); // Esquerda
-                remoteCube3.transform.position = new Vector3(-8f, 2f, 0f);   // Direita
-
-                // Inicializa remotePos corretamente
-                remotePos = remoteCube1.transform.position;
-                remotePos = remoteCube2.transform.position;
-                remotePos = remoteCube3.transform.position;
-
-            }
-
-            // Reset da bola
-            if (bola != null)
-            {
-                bola.transform.position = Vector3.zero;
-                var rb = bola.GetComponent<Rigidbody2D>();
-                if (rb != null)
-                    rb.linearVelocity = Vector2.zero;
+                byte[] data = udp.Receive(ref anyIP);
+                string text = Encoding.UTF8.GetString(data);
+                ProcessMessage(text);
             }
         }
-        else if (msg.StartsWith("POS:"))
+        catch (Exception e)
         {
-            string[] parts = msg.Substring(4).Split(';');
-            if (parts.Length == 3)
-            {
-                int id = int.Parse(parts[0]);
-                if (id != myId)
-                {
-                    float x = float.Parse(parts[1], CultureInfo.InvariantCulture);
-                    float y = float.Parse(parts[2], CultureInfo.InvariantCulture);
-                    remotePos = new Vector3(x, y, 0);
-                }
-            }
-        }
-        else if (msg.StartsWith("BALL:"))
-        {
-            // Só atualiza se não for o host da bola (ID 2)
-            if (myId != 2)
-            {
-                string[] parts = msg.Substring(5).Split(';');
-                if (parts.Length == 2)
-                {
-                    float x = float.Parse(parts[0], CultureInfo.InvariantCulture);
-                    float y = float.Parse(parts[1], CultureInfo.InvariantCulture);
-
-                    if (bola != null)
-                        bola.transform.position = new Vector3(x, y, 0);
-                }
-            }
-        }
-        else if (msg.StartsWith("SCORE:"))
-        {
-            string[] parts = msg.Substring(6).Split(';');
-            if (parts.Length == 2)
-            {
-                int scoreA = int.Parse(parts[0]);
-                int scoreB = int.Parse(parts[1]);
-
-                if (bola != null)
-                {
-                    Bola bolaScript = bola.GetComponent<Bola>();
-                    bolaScript.PontoA = scoreA;
-                    bolaScript.PontoB = scoreB;
-                    bolaScript.textoPontoA.text = scoreA.ToString();
-                    bolaScript.textoPontoB.text = scoreB.ToString();
-                }
-            }
+            Debug.Log("Erro na thread UDP: " + e.Message);
         }
     }
 
     public void SendUdpMessage(string msg)
     {
-        client.Send(Encoding.UTF8.GetBytes(msg), msg.Length);
+        try
+        {
+            byte[] data = Encoding.UTF8.GetBytes(msg);
+            udp.Send(data, data.Length, remoteEndPoint);
+        }
+        catch (Exception e)
+        {
+            Debug.Log("Erro ao enviar UDP: " + e.Message);
+        }
     }
 
-    void OnApplicationQuit()
+    private void ProcessMessage(string msg)
     {
-        receiveThread.Abort();
-        client.Close();
+        if (string.IsNullOrEmpty(msg)) return;
+
+        // --------------------------
+        // POSIÇÃO DAS RAQUETES
+        // --------------------------
+        if (msg.StartsWith("POS:"))
+        {
+            string[] parts = msg.Substring(4).Split(';');
+            if (parts.Length < 3) return;
+
+            if (!float.TryParse(parts[1], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float x)) return;
+            if (!float.TryParse(parts[2], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float y)) return;
+
+            int senderId = (int)float.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
+
+            Vector3 receivedPos = new Vector3(x, y, 0);
+
+            // Evita sobrescrever a posição do próprio jogador
+            if (senderId == myId) return;
+
+            // Atribui ao cubo remoto correto
+            if (remoteCube1 != null && remoteCube1.name.Contains(senderId.ToString()))
+                remotePos1 = receivedPos;
+            else if (remoteCube2 != null && remoteCube2.name.Contains(senderId.ToString()))
+                remotePos2 = receivedPos;
+            else if (remoteCube3 != null && remoteCube3.name.Contains(senderId.ToString()))
+                remotePos3 = receivedPos;
+        }
+
+        // --------------------------
+        // POSIÇÃO DA BOLA
+        // --------------------------
+        else if (msg.StartsWith("BALL:"))
+        {
+            string[] parts = msg.Substring(5).Split(';');
+            if (parts.Length < 2) return;
+
+            if (float.TryParse(parts[0], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float x) &&
+                float.TryParse(parts[1], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float y))
+            {
+                bolaPos = new Vector3(x, y, 0);
+                bolaAtiva = true;
+            }
+        }
+
+        // --------------------------
+        // PLACAR
+        // --------------------------
+        else if (msg.StartsWith("SCORE:"))
+        {
+            Debug.Log("Placar recebido: " + msg);
+        }
+
+        // --------------------------
+        // GAME OVER
+        // --------------------------
+        else if (msg.StartsWith("GAMEOVER:"))
+        {
+            Debug.Log("Fim de jogo recebido: " + msg);
+        }
+    }
+
+    private void OnApplicationQuit()
+    {
+        if (receiveThread != null) receiveThread.Abort();
+        if (udp != null) udp.Close();
     }
 }
