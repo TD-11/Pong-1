@@ -128,7 +128,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 44586298}
-  - component: {fileID: 44586297}
+  - component: {fileID: 44586299}
   m_Layer: 0
   m_Name: ClientCode
   m_TagString: Untagged
@@ -136,26 +136,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &44586297
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 44586296}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ef21ed4f7497e9d40a22d58921b98e98, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  myId: -1
-  Velocidade: 20
-  localCube: {fileID: 251716031}
-  remoteCubes:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  bola: {fileID: 982695413}
 --- !u!4 &44586298
 Transform:
   m_ObjectHideFlags: 0
@@ -171,6 +151,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &44586299
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 44586296}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5db705cb71ceb6e41bf3f6d6d386b7ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  myId: -1
+  Velocidade: 20
+  bola: {fileID: 982695413}
 --- !u!1 &125305613
 GameObject:
   m_ObjectHideFlags: 0
@@ -744,8 +739,8 @@ MonoBehaviour:
   PontoB: 0
   textoPontoA: {fileID: 1890695342}
   textoPontoB: {fileID: 125305615}
-  VitoriaTime1: {fileID: 0}
-  VitoriaTime2: {fileID: 0}
+  VitoriaTime1: {fileID: 1239979855}
+  VitoriaTime2: {fileID: 1541976957}
   velocidade: 15
   fatorDesvio: 2
 --- !u!1 &1067856764 stripped
