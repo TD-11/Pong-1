@@ -1,7 +1,7 @@
 using UnityEngine;
 using TMPro;
 
-public class Bola : MonoBehaviour
+public class BolaTwoPlayers : MonoBehaviour
 {
     private Rigidbody2D rb;
     private UdpClientTwoClients udpClient;
