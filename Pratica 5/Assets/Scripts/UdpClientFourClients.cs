@@ -23,7 +23,7 @@ public class UdpClientFourClients : MonoBehaviour
     void Start()
     {
         client = new UdpClient();
-        serverEP = new IPEndPoint(IPAddress.Parse("10.57.1.183"), 5001);
+        serverEP = new IPEndPoint(IPAddress.Parse("10.57.1.27"), 5001);
         client.Connect(serverEP);
 
         receiveThread = new Thread(ReceiveData);
