@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Globalization;
 using System.Collections.Concurrent;
+using TMPro; // ← importante
 
 public class UdpClientFourClients : MonoBehaviour
 {
@@ -20,6 +21,11 @@ public class UdpClientFourClients : MonoBehaviour
     private ConcurrentQueue<string> messageQueue = new ConcurrentQueue<string>();
     public int Velocidade = 15;
 
+    // --- HUD ---
+    [Header("HUD")]
+    public TextMeshProUGUI playerInfoText; // Texto discreto que mostra o jogador
+    private string[] playerNames = { "Jogador 1.1", "Jogador 1.2", "Jogador 2.2", "Jogador 2.1" };
+
     void Start()
     {
         client = new UdpClient();
@@ -31,7 +37,6 @@ public class UdpClientFourClients : MonoBehaviour
 
         client.Send(Encoding.UTF8.GetBytes("HELLO"), 5);
 
-        // inicializa posições remotas
         for (int i = 0; i < 4; i++)
             remotePos[i] = Vector3.zero;
 
@@ -42,6 +47,10 @@ public class UdpClientFourClients : MonoBehaviour
             if (rb != null)
                 rb.linearVelocity = Vector2.zero;
         }
+
+        // --- HUD ---
+        if (playerInfoText != null)
+            playerInfoText.text = "Conectando ao servidor...";
     }
 
     void Update()
@@ -51,21 +60,17 @@ public class UdpClientFourClients : MonoBehaviour
 
         if (myId == -1) return;
 
-        // Movimento do jogador local
         float v = Input.GetAxis("Vertical");
         GameObject local = players[myId - 1];
         local.transform.Translate(new Vector3(0, v, 0) * Time.deltaTime * Velocidade);
 
-        // Limite vertical
         Vector3 pos = local.transform.position;
         pos.y = Mathf.Clamp(pos.y, -3f, 3f);
         local.transform.position = pos;
 
-        // Envia posição
         string msgPos = $"POS:{myId};{pos.x.ToString("F2", CultureInfo.InvariantCulture)};{pos.y.ToString("F2", CultureInfo.InvariantCulture)}";
         SendUdpMessage(msgPos);
 
-        // Atualiza posições remotas
         for (int i = 0; i < 4; i++)
         {
             if (i != myId - 1)
@@ -90,7 +95,15 @@ public class UdpClientFourClients : MonoBehaviour
         {
             myId = int.Parse(msg.Substring(7));
             Debug.Log("[Cliente] Meu ID = " + myId);
+
             PosicionarJogadores();
+
+            // --- HUD ---
+            if (playerInfoText != null && myId >= 1 && myId <= 4)
+            {
+                playerInfoText.text = $"Você é o <b>{playerNames[myId - 1]}</b>";
+                playerInfoText.color = new Color(1f, 1f, 1f, 0.6f); // texto branco semitransparente
+            }
         }
         else if (msg.StartsWith("POS:"))
         {
@@ -138,13 +151,11 @@ public class UdpClientFourClients : MonoBehaviour
 
     void PosicionarJogadores()
     {
-        // Posições fixas para cada ID
         players[0].transform.position = new Vector3(-8f, 0f, 0f); // 1.1
         players[1].transform.position = new Vector3(-6f, 0f, 0f); // 1.2
         players[2].transform.position = new Vector3(6f, 0f, 0f);  // 2.2
         players[3].transform.position = new Vector3(8f, 0f, 0f);  // 2.1
 
-        // Reset bola
         if (bola != null)
         {
             bola.transform.position = Vector3.zero;
