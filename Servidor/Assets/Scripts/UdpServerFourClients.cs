@@ -32,7 +32,7 @@ public class UdpServerFourClients : MonoBehaviour
             string msg = Encoding.UTF8.GetString(data);
             string key = anyEP.Address + ":" + anyEP.Port;
 
-            // Atribui ID novo (até 4)
+            // Atribui ID ao cliente novo
             if (!clientIds.ContainsKey(key))
             {
                 if (nextId <= 4)
@@ -50,8 +50,10 @@ public class UdpServerFourClients : MonoBehaviour
                 }
             }
 
-            // retransmite mensagens
-            if (msg.StartsWith("POS:") || msg.StartsWith("BALL:") || msg.StartsWith("SCORE:"))
+            Debug.Log($"Servidor recebeu: {msg}");
+
+            // 🔁 Retransmite as mensagens para todos os clientes
+            if (msg.StartsWith("POS:") || msg.StartsWith("BALL:") || msg.StartsWith("SCORE:") || msg.StartsWith("CHAT:"))
             {
                 byte[] bdata = Encoding.UTF8.GetBytes(msg);
                 foreach (var kvp in clientIds)
