@@ -5,7 +5,8 @@ using System.Text;
 using System.Threading;
 using System.Globalization;
 using System.Collections.Concurrent;
-using TMPro; // ← importante
+using TMPro;
+using System.Collections;
 
 public class UdpClientFourClients : MonoBehaviour
 {
@@ -14,17 +15,22 @@ public class UdpClientFourClients : MonoBehaviour
     Thread receiveThread;
     IPEndPoint serverEP;
 
-    public GameObject[] players; // 4 players arrastados no Inspector
+    public GameObject[] players; 
     public GameObject bola;
 
     private Vector3[] remotePos = new Vector3[4];
     private ConcurrentQueue<string> messageQueue = new ConcurrentQueue<string>();
     public int Velocidade = 15;
 
-    // --- HUD ---
     [Header("HUD")]
-    public TextMeshProUGUI playerInfoText; // Texto discreto que mostra o jogador
+    public TextMeshProUGUI playerInfoText; 
+    public TextMeshProUGUI chatText;        // ← adiciona no HUD
     private string[] playerNames = { "Jogador 1.1", "Jogador 1.2", "Jogador 2.2", "Jogador 2.1" };
+
+    // --- Catálogo de mensagens rápidas ---
+    private string[] mensagensRapidas = {
+        "Boa!", "Foi por pouco!", "Defende aí!", "Toca pra mim!", "GG!"
+    };
 
     void Start()
     {
@@ -48,9 +54,10 @@ public class UdpClientFourClients : MonoBehaviour
                 rb.linearVelocity = Vector2.zero;
         }
 
-        // --- HUD ---
         if (playerInfoText != null)
             playerInfoText.text = "Conectando ao servidor...";
+        if (chatText != null)
+            chatText.text = "";
     }
 
     void Update()
@@ -60,6 +67,7 @@ public class UdpClientFourClients : MonoBehaviour
 
         if (myId == -1) return;
 
+        // Movimento
         float v = Input.GetAxis("Vertical");
         GameObject local = players[myId - 1];
         local.transform.Translate(new Vector3(0, v, 0) * Time.deltaTime * Velocidade);
@@ -76,6 +84,13 @@ public class UdpClientFourClients : MonoBehaviour
             if (i != myId - 1)
                 players[i].transform.position = Vector3.Lerp(players[i].transform.position, remotePos[i], Time.deltaTime * 10f);
         }
+
+        // --- Teclas de mensagens rápidas ---
+        if (Input.GetKeyDown(KeyCode.Alpha1)) EnviarMensagemRapida(0);
+        if (Input.GetKeyDown(KeyCode.Alpha2)) EnviarMensagemRapida(1);
+        if (Input.GetKeyDown(KeyCode.Alpha3)) EnviarMensagemRapida(2);
+        if (Input.GetKeyDown(KeyCode.Alpha4)) EnviarMensagemRapida(3);
+        if (Input.GetKeyDown(KeyCode.Alpha5)) EnviarMensagemRapida(4);
     }
 
     void ReceiveData()
@@ -95,14 +110,12 @@ public class UdpClientFourClients : MonoBehaviour
         {
             myId = int.Parse(msg.Substring(7));
             Debug.Log("[Cliente] Meu ID = " + myId);
-
             PosicionarJogadores();
 
-            // --- HUD ---
             if (playerInfoText != null && myId >= 1 && myId <= 4)
             {
                 playerInfoText.text = $"Você é o <b>{playerNames[myId - 1]}</b>";
-                playerInfoText.color = new Color(1f, 1f, 1f, 0.6f); // texto branco semitransparente
+                playerInfoText.color = new Color(1f, 1f, 1f, 0.6f);
             }
         }
         else if (msg.StartsWith("POS:"))
@@ -147,6 +160,44 @@ public class UdpClientFourClients : MonoBehaviour
                 }
             }
         }
+        // --- Mensagens de chat ---
+        else if (msg.StartsWith("CHAT:"))
+        {
+            string[] p = msg.Substring(5).Split(';');
+            if (p.Length == 2)
+            {
+                int id = int.Parse(p[0]);
+                string texto = p[1];
+                MostrarMensagem($"{playerNames[id - 1]}: {texto}");
+            }
+        }
+    }
+
+    // --- Envio de mensagem rápida ---
+    void EnviarMensagemRapida(int index)
+    {
+        if (index < 0 || index >= mensagensRapidas.Length) return;
+
+        string msg = $"CHAT:{myId};{mensagensRapidas[index]}";
+        SendUdpMessage(msg);
+        MostrarMensagem($"Você: {mensagensRapidas[index]}");
+    }
+
+    // --- Exibe mensagem no HUD ---
+    void MostrarMensagem(string texto)
+    {
+        if (chatText == null) return;
+        StopAllCoroutines();
+        chatText.text = texto;
+        chatText.color = new Color(1f, 1f, 1f, 0.85f);
+        StartCoroutine(LimparMensagem());
+    }
+
+    IEnumerator LimparMensagem()
+    {
+        yield return new WaitForSeconds(3f);
+        if (chatText != null)
+            chatText.text = "";
     }
 
     void PosicionarJogadores()
