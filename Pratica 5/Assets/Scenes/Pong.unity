@@ -130,6 +130,7 @@ GameObject:
   - component: {fileID: 44586298}
   - component: {fileID: 44586297}
   - component: {fileID: 44586299}
+  - component: {fileID: 44586300}
   m_Layer: 0
   m_Name: ClientCode
   m_TagString: Untagged
@@ -191,6 +192,22 @@ MonoBehaviour:
   Velocidade: 15
   playerInfoText: {fileID: 482105065}
   chatText: {fileID: 1244643057}
+--- !u!114 &44586300
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 44586296}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0e3cf2e93dbc204887f14dbec8bafd1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  serverIP: 10.57.1.183
+  port: 6000
+  myId: -1
+  chatText: {fileID: 0}
 --- !u!1 &125305613
 GameObject:
   m_ObjectHideFlags: 0

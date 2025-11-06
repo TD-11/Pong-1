@@ -53,7 +53,7 @@ public class UdpServerFourClients : MonoBehaviour
             Debug.Log($"Servidor recebeu: {msg}");
 
             // 🔁 Retransmite as mensagens para todos os clientes
-            if (msg.StartsWith("POS:") || msg.StartsWith("BALL:") || msg.StartsWith("SCORE:") || msg.StartsWith("CHAT:"))
+            if (msg.StartsWith("POS:") || msg.StartsWith("BALL:") || msg.StartsWith("SCORE:"))
             {
                 byte[] bdata = Encoding.UTF8.GetBytes(msg);
                 foreach (var kvp in clientIds)
