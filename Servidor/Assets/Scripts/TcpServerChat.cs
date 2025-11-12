@@ -77,14 +77,20 @@ public class TcpServerChat : MonoBehaviour
         byte[] data = Encoding.UTF8.GetBytes(message);
         lock (clients)
         {
-            foreach (var c in clients)
+            foreach (var c in new List<TcpClient>(clients))
             {
                 try
                 {
-                    NetworkStream s = c.GetStream();
-                    s.Write(data, 0, data.Length);
+                    if (c.Connected)
+                    {
+                        NetworkStream s = c.GetStream();
+                        s.Write(data, 0, data.Length);
+                    }
                 }
-                catch { }
+                catch
+                {
+                    clients.Remove(c);
+                }
             }
         }
     }

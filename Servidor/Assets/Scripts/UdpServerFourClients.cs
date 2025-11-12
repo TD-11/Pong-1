@@ -21,7 +21,7 @@ public class UdpServerFourClients : MonoBehaviour
         receiveThread = new Thread(ReceiveData);
         receiveThread.Start();
 
-        Debug.Log("Servidor iniciado na porta 5001 (modo 4 jogadores)");
+        Debug.Log("Servidor UDP iniciado na porta 5001 (modo 4 jogadores)");
     }
 
     void ReceiveData()
@@ -32,7 +32,7 @@ public class UdpServerFourClients : MonoBehaviour
             string msg = Encoding.UTF8.GetString(data);
             string key = anyEP.Address + ":" + anyEP.Port;
 
-            // Atribui ID ao cliente novo
+            // Atribui ID a novos clientes
             if (!clientIds.ContainsKey(key))
             {
                 if (nextId <= 4)
@@ -50,9 +50,9 @@ public class UdpServerFourClients : MonoBehaviour
                 }
             }
 
-            Debug.Log($"Servidor recebeu: {msg}");
+            Debug.Log($"[Servidor UDP] Recebido: {msg}");
 
-            // 🔁 Retransmite as mensagens para todos os clientes
+            // Reenvia apenas dados de jogo
             if (msg.StartsWith("POS:") || msg.StartsWith("BALL:") || msg.StartsWith("SCORE:"))
             {
                 byte[] bdata = Encoding.UTF8.GetBytes(msg);
@@ -63,6 +63,9 @@ public class UdpServerFourClients : MonoBehaviour
                     server.Send(bdata, bdata.Length, ep);
                 }
             }
+
+            // 🔴 Removido: qualquer coisa relacionada a CHAT:
+            // O servidor UDP não retransmite mensagens de chat agora.
         }
     }
 

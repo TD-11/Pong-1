@@ -191,7 +191,7 @@ MonoBehaviour:
   bola: {fileID: 982695413}
   Velocidade: 15
   playerInfoText: {fileID: 482105065}
-  chatText: {fileID: 1244643057}
+  chatText: {fileID: 0}
 --- !u!114 &44586300
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -204,10 +204,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f0e3cf2e93dbc204887f14dbec8bafd1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverIP: 10.57.1.183
+  serverIP: 10.57.10.23
   port: 6000
+  chatText: {fileID: 1244643057}
   myId: -1
-  chatText: {fileID: 0}
 --- !u!1 &125305613
 GameObject:
   m_ObjectHideFlags: 0
