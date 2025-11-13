@@ -191,7 +191,6 @@ MonoBehaviour:
   bola: {fileID: 982695413}
   Velocidade: 15
   playerInfoText: {fileID: 482105065}
-  chatText: {fileID: 0}
 --- !u!114 &44586300
 MonoBehaviour:
   m_ObjectHideFlags: 0

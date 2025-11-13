@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Globalization;
 using System.Collections.Concurrent;
+using TMPro; // ← necessário para usar TextMeshProUGUI
 
 public class UdpClientFourClients : MonoBehaviour
 {
@@ -21,6 +22,10 @@ public class UdpClientFourClients : MonoBehaviour
     public int Velocidade = 15;
 
     private string[] playerNames = { "Jogador 1.1", "Jogador 1.2", "Jogador 2.2", "Jogador 2.1" };
+
+    // --- HUD ---
+    [Header("HUD")]
+    public TextMeshProUGUI playerInfoText;
 
     void Start()
     {
@@ -43,6 +48,10 @@ public class UdpClientFourClients : MonoBehaviour
             if (rb != null)
                 rb.linearVelocity = Vector2.zero;
         }
+
+        // --- HUD inicial ---
+        if (playerInfoText != null)
+            playerInfoText.text = "Conectando ao servidor...";
     }
 
     void Update()
@@ -90,6 +99,13 @@ public class UdpClientFourClients : MonoBehaviour
             myId = int.Parse(msg.Substring(7));
             Debug.Log("[Cliente UDP] Meu ID = " + myId);
             PosicionarJogadores();
+
+            // --- Mostra o nome do jogador no HUD ---
+            if (playerInfoText != null && myId >= 1 && myId <= 4)
+            {
+                playerInfoText.text = $"Você é o <b>{playerNames[myId - 1]}</b>";
+                playerInfoText.color = new Color(1f, 1f, 1f, 0.75f); // branco translúcido
+            }
         }
         else if (msg.StartsWith("POS:"))
         {
